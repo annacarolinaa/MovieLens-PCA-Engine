@@ -114,24 +114,47 @@ def load_data():
     return ratings, movies
 
 
+@st.cache_data
+def prepare_model(ratings: pd.DataFrame, n_components: int = 20, holdout_fraction: float = 0.10, seed: int = 42):
+    matrix = ratings.pivot(index="user", columns="item", values="rating")
+    observed_mask = ~matrix.isna()
+    rng = np.random.default_rng(seed)
+    holdout = observed_mask & (rng.random(matrix.shape) < holdout_fraction)
+
+    if not holdout.any().any():
+        first_row, first_col = np.argwhere(observed_mask.to_numpy())[0]
+        holdout.iat[first_row, first_col] = True
+
+    train = matrix.mask(holdout)
+    means = train.mean(axis=1)
+    centered = train.sub(means, axis=0).fillna(0)
+
+    pca = PCA(n_components=n_components, random_state=seed)
+    latent = pca.fit_transform(centered)
+    recon = pca.inverse_transform(latent)
+
+    final = pd.DataFrame(recon, index=matrix.index, columns=matrix.columns).add(means, axis=0).clip(1, 5)
+    true = matrix.where(holdout).stack()
+    predicted = final.where(holdout).stack()
+    rmse = np.sqrt(((true - predicted) ** 2).mean())
+
+    return {
+        "matrix": matrix,
+        "final": final,
+        "pca": pca,
+        "means": means,
+        "holdout": holdout,
+        "rmse": float(rmse),
+    }
+
 
 ratings, movies = load_data()
-matrix = ratings.pivot(index="user", columns="item", values="rating")
-
-mask = ~matrix.isna()
-random_mask = np.random.rand(*matrix.shape) < 0.1
-holdout = mask & random_mask
-
-train = matrix.mask(holdout)
-
-means = train.mean(axis=1)
-centered = train.sub(means, axis=0).fillna(0)
-
-pca = PCA(n_components=20)
-latent = pca.fit_transform(centered)
-recon = pca.inverse_transform(latent)
-
-final = pd.DataFrame(recon, index=matrix.index, columns=matrix.columns).add(means, axis=0).clip(1, 5)
+model = prepare_model(ratings, n_components=20, seed=42)
+matrix = model["matrix"]
+final = model["final"]
+pca = model["pca"]
+holdout = model["holdout"]
+rmse = model["rmse"]
 
 if "i" not in st.session_state:
     st.session_state.i = 0
