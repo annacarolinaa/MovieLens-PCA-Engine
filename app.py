@@ -351,9 +351,17 @@ def prepare_recommender(
     )
     final_matrix = reconstructed_df.add(user_means, axis=0).clip(1, 5)
 
-    hidden_actual = full_matrix.where(holdout_mask).stack()
-    hidden_predicted = final_matrix.where(holdout_mask).stack()
-    rmse = float(np.sqrt(mean_squared_error(hidden_actual.values, hidden_predicted.values)))
+    hidden_actual = full_matrix.where(holdout_mask).stack().astype(float)
+    hidden_predicted = final_matrix.where(holdout_mask).stack().astype(float)
+    hidden_actual, hidden_predicted = hidden_actual.align(hidden_predicted)
+    valid_mask = hidden_actual.notna() & hidden_predicted.notna()
+    hidden_actual = hidden_actual[valid_mask]
+    hidden_predicted = hidden_predicted[valid_mask]
+
+    if hidden_actual.empty:
+        rmse = float("nan")
+    else:
+        rmse = float(np.sqrt(mean_squared_error(hidden_actual.values, hidden_predicted.values)))
 
     explained_variance = float(pca.explained_variance_ratio_.sum())
     sparsity = float(full_matrix.isna().sum().sum() / full_matrix.size)
