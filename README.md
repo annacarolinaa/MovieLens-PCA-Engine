@@ -1,32 +1,35 @@
 # CinemaMatch PCA
 
-Sistema de recomendacao de filmes desenvolvido com **Streamlit**, **PCA** e a base **MovieLens 100k**. O projeto foi construido a partir da metodologia vista em aula, usando a matriz usuario-item, centragem por usuario e **matrix completion com PCA** para estimar ratings e gerar recomendacoes personalizadas.
+## Overview / Visión general / Visão geral
 
-## Visao geral
+CinemaMatch PCA is an interactive movie recommendation app built with **Streamlit**, **PCA**, and the **MovieLens 100k** dataset.
 
-Este projeto transforma o fluxo da aula em um dashboard interativo e responsivo. A aplicacao permite:
+El proyecto muestra cómo PCA puede reconstruir una matriz usuario-item para predecir ratings faltantes.
 
-- visualizar a matriz usuario-item com dados faltantes;
-- aplicar PCA para reconstruir ratings ausentes;
-- avaliar o modelo escondendo 10% dos ratings observados;
-- explorar similaridade entre filmes populares;
-- gerar recomendacoes para usuarios reais da base;
-- simular um usuario convidado avaliando alguns filmes.
+O projeto demonstra um sistema que usa PCA para estimar avaliações ausentes e recomendar filmes.
 
-## Metodologia
+## What it does / Qué hace / O que faz
 
-O sistema segue a mesma logica apresentada no material da disciplina:
+- Loads the MovieLens 100k dataset from `u.data` and `u.item`
+- Builds a user-item rating matrix
+- Hides 10% of observed ratings for evaluation
+- Centers ratings by user mean
+- Applies PCA to reconstruct the rating matrix
+- Estimates missing user ratings and generates recommendations
+- Displays model metrics, heatmaps and recommended movies
 
-1. carregar os arquivos `u.data` e `u.item`;
-2. construir a matriz usuario-item;
-3. esconder aleatoriamente 10% dos ratings para avaliacao;
-4. centralizar os ratings em torno da media de cada usuario;
-5. preencher faltantes com zero na matriz centrada;
-6. aplicar PCA para reduzir dimensionalidade e reconstruir a matriz;
-7. calcular o erro de reconstrucao com RMSE;
-8. recomendar filmes ainda nao vistos com base nos maiores scores previstos.
+## How it works / Cómo funciona / Como funciona
 
-## Tecnologias utilizadas
+1. Carga los archivos `u.data` y `u.item`.
+2. Construye la matriz usuario-item.
+3. Oculta aleatoriamente 10% de los ratings observados.
+4. Centra los ratings según la media de cada usuario.
+5. Rellena valores faltantes con cero en la matriz centrada.
+6. Aplica PCA para reducir dimensionalidad y reconstruir la matriz.
+7. Calcula el error con RMSE usando los valores ocultos.
+8. Recomienda películas no vistas según las puntuaciones estimadas.
+
+## Technologies / Tecnologías / Tecnologias
 
 - Python
 - Streamlit
@@ -38,53 +41,47 @@ O sistema segue a mesma logica apresentada no material da disciplina:
 
 ## Dataset
 
-Foi utilizada a base **MovieLens 100k**, composta por:
+The app uses the **MovieLens 100k** dataset.
 
-- `u.data`: avaliacoes dos usuarios;
-- `u.item`: informacoes dos filmes, incluindo titulo e generos.
+- `u.data`: user rating records
+- `u.item`: movie metadata and genres
 
-## Funcionalidades do app
+## Usage / Uso / Uso
 
-- dashboard com layout responsivo;
-- metricas principais do modelo;
-- heatmap de dados faltantes;
-- heatmap da matriz reconstruida;
-- grafico de variancia explicada do PCA;
-- analise de popularidade vs. nota media;
-- mapa de similaridade entre filmes populares;
-- recomendador por usuario do dataset;
-- recomendador para usuario convidado.
-
-## Como executar
-
-1. Instale as dependencias:
+1. Install dependencies:
 
 ```bash
-pip install streamlit pandas numpy scikit-learn matplotlib seaborn
+pip install -r requirements.txt
 ```
 
-2. Execute a aplicacao:
+2. Run the app:
 
 ```bash
 streamlit run app.py
 ```
 
-3. Abra o navegador no endereco exibido pelo Streamlit.
+3. Open the browser at the address shown by Streamlit.
 
-## Estrutura do projeto
+## Project structure / Estructura del proyecto / Estrutura do projeto
 
 ```text
 .
 |-- app.py
 |-- u.data
 |-- u.item
+|-- requirements.txt
 |-- README.md
 ```
 
-## Resultado esperado
+## Expected result / Resultado esperado / Resultado esperado
 
-Ao executar o app, o usuario pode explorar o comportamento da base, entender como o PCA reconstrui a matriz de ratings e visualizar recomendacoes de filmes de forma clara e interativa.
+When the app runs, you can explore the dataset, see how PCA reconstructs the rating matrix, and view personalized movie recommendations in a clean interface.
 
-## Autor
+## Notes / Notas / Observações
 
-Projeto academico desenvolvido para a disciplina de Sistemas de Recomendacao.
+- `app.py`, `u.data` and `u.item` remain unchanged.
+- The project is focused on the Streamlit app and the MovieLens dataset.
+
+## Author / Autor
+
+Academic project developed for recommendation systems coursework.

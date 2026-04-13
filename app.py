@@ -1,313 +1,284 @@
-from pathlib import Path
-
+﻿from pathlib import Path
 import numpy as np
 import pandas as pd
 import streamlit as st
-from sklearn.decomposition import TruncatedSVD
+from sklearn.decomposition import PCA
 
-st.set_page_config(
-    page_title="AnnaFlix Recommender",
-    page_icon="🎬",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
+st.set_page_config(page_title="CinemaMatch PCA", layout="wide")
 
 DATA_DIR = Path(__file__).resolve().parent
-GENRE_COLUMNS = [
-    "unknown",
-    "Action",
-    "Adventure",
-    "Animation",
-    "Childrens",
-    "Comedy",
-    "Crime",
-    "Documentary",
-    "Drama",
-    "Fantasy",
-    "Film-Noir",
-    "Horror",
-    "Musical",
-    "Mystery",
-    "Romance",
-    "Sci-Fi",
-    "Thriller",
-    "War",
-    "Western",
+
+GENRES = [
+    "unknown", "Action", "Adventure", "Animation", "Childrens", "Comedy", "Crime",
+    "Documentary", "Drama", "Fantasy", "Film-Noir", "Horror", "Musical",
+    "Mystery", "Romance", "Sci-Fi", "Thriller", "War", "Western"
 ]
 
+st.markdown(
+    """
+<style>
+.stApp { background: #f5f5f5; color: #222; }
 
-def inject_styles() -> None:
-    st.markdown(
-        """
-        <style>
-        :root {
-            color-scheme: dark;
-            color: #f8efe7;
-            background-color: #221b2d;
-        }
-        .stApp {
-            background: linear-gradient(180deg, #221b2d 0%, #3f2a4d 45%, #f7ede6 100%);
-            color: #f8efe7;
-        }
-        .block-container {
-            padding: 1.5rem 2.2rem 2.2rem 2.2rem;
-            max-width: 1120px;
-        }
-        h1, h2, h3, h4, h5, h6 {
-            font-family: Inter, system-ui, sans-serif;
-            color: #ffffff;
-        }
-        .movie-card {
-            background: rgba(255, 250, 245, 0.96);
-            border: 1px solid rgba(255, 168, 190, 0.24);
-            border-radius: 20px;
-            padding: 22px;
-            margin-bottom: 18px;
-            box-shadow: 0 20px 40px rgba(17, 17, 26, 0.12);
-        }
-        .movie-title {
-            color: #2b1b34;
-            font-size: 1.2rem;
-            margin: 0;
-            font-weight: 700;
-        }
-        .movie-meta {
-            color: #6e5873;
-            font-size: 0.93rem;
-            margin: 8px 0 0;
-        }
-        .stButton > button {
-            background-color: #d879ff !important;
-            color: #1f1a2f !important;
-            border: none !important;
-            box-shadow: 0 10px 20px rgba(216, 121, 255, 0.22) !important;
-        }
-        .subtitle {
-            color: #ead1d8;
-            margin-top: -10px;
-            margin-bottom: 24px;
-            font-size: 1rem;
-        }
-        .brand-badge {
-            display: inline-flex;
-            padding: 4px 10px;
-            border-radius: 999px;
-            background: rgba(216, 121, 255, 0.18);
-            color: #f7e8f2;
-            font-size: 0.9rem;
-            margin-bottom: 18px;
-        }
-        footer {visibility: hidden;}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+.block-container {
+    max-width: 980px;
+    padding-top: 5.5rem;
+    padding-bottom: 5.5rem;
+}
+
+.card {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+}
+
+.hero {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 16px;
+}
+
+.movie-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.movie-meta {
+    color: #666;
+    font-size: 0.94rem;
+    line-height: 1.5;
+}
+
+.score {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #f0f0f0;
+    font-weight: 600;
+}
+
+.small-note {
+    color: #666;
+    font-size: 0.92rem;
+}
+
+.nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(255,255,255,0.96);
+    border-top: 1px solid #ddd;
+    padding: 10px 18px;
+    z-index: 999;
+}
+
+div.stButton > button {
+    background: #222 !important;
+    color: white !important;
+    border: none !important;
+}
+</style>
+""",
+    unsafe_allow_html=True,
+)
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data
 def load_data():
     ratings = pd.read_csv(
         DATA_DIR / "u.data",
         sep="\t",
-        names=["user_id", "item_id", "rating", "timestamp"],
-        engine="python",
+        names=["user", "item", "rating", "time"],
     )
 
-    movie_columns = [
-        "item_id",
-        "title",
-        "release_date",
-        "video_release_date",
-        "imdb_url",
-        *GENRE_COLUMNS,
-    ]
     movies = pd.read_csv(
         DATA_DIR / "u.item",
         sep="|",
-        names=movie_columns,
+        names=["item", "title", "date", "v", "url", *GENRES],
         encoding="latin-1",
-        engine="python",
     )
-    movies["genre_list"] = movies.apply(
-        lambda row: ", ".join([genre for genre in GENRE_COLUMNS if int(row[genre]) == 1]),
+
+    movies["genres"] = movies.apply(
+        lambda row: ", ".join([genre for genre in GENRES if str(row[genre]) == "1"]),
         axis=1,
     )
-    movies["release_year"] = movies["release_date"].str[-4:]
-    movies["release_year"] = movies["release_year"].where(
-        movies["release_year"].str.fullmatch(r"\d{4}"), "",
-    )
-    return ratings, movies[["item_id", "title", "genre_list", "release_year"]]
+    movies["year"] = movies["date"].fillna("").str[-4:]
+    movies["year"] = movies["year"].where(movies["year"].str.fullmatch(r"\d{4}"), "")
+    return ratings, movies
 
 
-@st.cache_data(show_spinner=False)
-def get_popular_movies(ratings: pd.DataFrame, min_ratings: int = 50) -> pd.DataFrame:
-    popular_ids = ratings["item_id"].value_counts()
-    popular_ids = popular_ids[popular_ids >= min_ratings].index
-    return popular_ids
 
-
-@st.cache_data(show_spinner=False)
-def build_user_item_matrix(ratings: pd.DataFrame, popular_ids: pd.Index) -> pd.DataFrame:
-    matrix = ratings[ratings["item_id"].isin(popular_ids)].pivot(
-        index="user_id", columns="item_id", values="rating"
-    )
-    return matrix
-
-
-def get_recommendations(
-    user_ratings: dict[int, int],
-    matrix: pd.DataFrame,
-    movies: pd.DataFrame,
-    top_n: int = 10,
-    n_components: int = 20,
-) -> pd.DataFrame:
-    user_id = int(matrix.index.max() + 1)
-    new_user = pd.Series(user_ratings, name=user_id)
-    combined = pd.concat([matrix, new_user.to_frame().T], sort=False)
-
-    user_means = combined.mean(axis=1)
-    centered = combined.sub(user_means, axis=0).fillna(0.0)
-
-    n_components = min(n_components, centered.shape[0] - 1, centered.shape[1] - 1)
-    n_components = max(1, n_components)
-
-    svd = TruncatedSVD(n_components=n_components, random_state=42)
-    factors = svd.fit_transform(centered)
-    reconstructed = svd.inverse_transform(factors)
-
-    predictions = (
-        pd.DataFrame(reconstructed, index=combined.index, columns=combined.columns)
-        .add(user_means, axis=0)
-        .clip(1, 5)
-    )
-
-    user_pred = predictions.loc[user_id].drop(index=list(user_ratings.keys()), errors="ignore")
-    top_recs = user_pred.sort_values(ascending=False).head(top_n).reset_index()
-    top_recs.columns = ["item_id", "predicted_rating"]
-    top_recs = top_recs.merge(movies, on="item_id", how="left")
-    return top_recs
-
-
-def reset_session():
-    for key in [
-        "view",
-        "started",
-        "current_idx",
-        "my_ratings",
-        "name",
-        "sample_movies",
-    ]:
-        if key in st.session_state:
-            del st.session_state[key]
-
-
-inject_styles()
 ratings, movies = load_data()
-popular_ids = get_popular_movies(ratings, min_ratings=60)
+matrix = ratings.pivot(index="user", columns="item", values="rating")
 
-if "view" not in st.session_state:
-    st.session_state.view = "home"
-if "started" not in st.session_state:
-    st.session_state.started = False
-if "current_idx" not in st.session_state:
-    st.session_state.current_idx = 0
-if "my_ratings" not in st.session_state:
-    st.session_state.my_ratings = {}
-if "name" not in st.session_state:
-    st.session_state.name = ""
-if "sample_movies" not in st.session_state:
-    st.session_state.sample_movies = (
-        movies[movies["item_id"].isin(popular_ids)]
-        .sample(20, random_state=42)
-        .reset_index(drop=True)
+mask = ~matrix.isna()
+random_mask = np.random.rand(*matrix.shape) < 0.1
+holdout = mask & random_mask
+
+train = matrix.mask(holdout)
+
+means = train.mean(axis=1)
+centered = train.sub(means, axis=0).fillna(0)
+
+pca = PCA(n_components=20)
+latent = pca.fit_transform(centered)
+recon = pca.inverse_transform(latent)
+
+final = pd.DataFrame(recon, index=matrix.index, columns=matrix.columns).add(means, axis=0).clip(1, 5)
+
+if "i" not in st.session_state:
+    st.session_state.i = 0
+if "ratings" not in st.session_state:
+    st.session_state.ratings = {}
+if "sample" not in st.session_state:
+    st.session_state.sample = movies.sample(20, random_state=42).reset_index(drop=True)
+
+sample = st.session_state.sample
+
+
+st.markdown(
+    """
+    <div class="hero">
+        <h1 style="margin:0;">CinemaMatch PCA</h1>
+        <div class="small-note">Califica algunas peliculas y obten tu Top 10 personalizado.</div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.markdown("---")
+st.subheader("Como funciona el sistema")
+st.markdown(
+    """
+    Este sistema construye una **matriz usuario-item**, centra los ratings por usuario y aplica
+    **PCA** para reconstruir preferencias. A partir de esa reconstruccion, estima los ratings
+    faltantes y genera un **Top 10** de peliculas no calificadas.
+    """
+)
+
+with st.expander("Ver logica principal en Python"):
+    st.code(
+        """
+matrix = ratings.pivot(index="user", columns="item", values="rating")
+
+means = matrix.mean(axis=1)
+centered = matrix.sub(means, axis=0).fillna(0)
+
+pca = PCA(n_components=20)
+latent = pca.fit_transform(centered)
+recon = pca.inverse_transform(latent)
+
+final = pd.DataFrame(recon, index=matrix.index, columns=matrix.columns).add(means, axis=0)
+        """,
+        language="python",
     )
 
-st.sidebar.title("AnnaFlix")
-st.sidebar.markdown("Bem-vindo ao recomendador com a cara da Anna. Avalie alguns filmes e receba sugestões feitas especialmente para você.")
-top_n = st.sidebar.slider("Quantas recomendações você quer?", 5, 15, 10)
+st.markdown("<br>", unsafe_allow_html=True)
 
-if st.session_state.view == "home":
-    st.title("AnnaFlix")
-    st.markdown("<div class='brand-badge'>by Anna</div>", unsafe_allow_html=True)
-    st.markdown("<p class='subtitle'>Responda rápido e descubra filmes que combinam com seu gosto.</p>", unsafe_allow_html=True)
+progress = min(st.session_state.i / len(sample), 1.0)
+st.progress(progress)
+st.caption(f"Peliculas calificadas: {min(st.session_state.i, len(sample))} de {len(sample)}")
 
-    if not st.session_state.started:
-        name_input = st.text_input("Seu nome", value=st.session_state.name)
-        if st.button("Começar"):
-            if name_input.strip():
-                st.session_state.name = name_input.strip()
-                st.session_state.started = True
-                st.experimental_rerun()
-            else:
-                st.warning("Por favor, insira seu nome para continuar.")
-    else:
-        current_idx = st.session_state.current_idx
-        movie = st.session_state.sample_movies.iloc[current_idx]
+if st.session_state.i < len(sample):
+    movie = sample.iloc[st.session_state.i]
+    movie_id = int(movie["item"])
 
+    saved_rating = st.session_state.ratings.get(movie_id, 3)
+
+    st.markdown(
+        f"""
+        <div class="card">
+            <div class="movie-title">{movie['title']}</div>
+            <div class="movie-meta">Generos: {movie['genres'] or 'No disponible'}</div>
+            <div class="movie-meta">Ano: {movie['year'] or 'No disponible'}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("#### Tu calificacion")
+    st.caption("1 = muy mala, 5 = excelente")
+
+    rating = st.radio(
+        "Selecciona una nota",
+        ["1", "2", "3", "4", "5"],
+        index=int(saved_rating) - 1,
+        horizontal=True,
+        label_visibility="collapsed",
+    )
+
+    st.session_state.ratings[movie_id] = int(rating)
+
+    st.markdown('<div class="nav">', unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
+
+    if col1.button("Anterior"):
+        if st.session_state.i > 0:
+            st.session_state.i -= 1
+            st.rerun()
+
+    if col2.button("Siguiente"):
+        st.session_state.i += 1
+        st.rerun()
+
+    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+
+else:
+    st.subheader("Top 10 recomendado")
+    st.caption("Peliculas no vistas con mayor puntuacion predicha por el modelo")
+
+    user_vector = pd.Series(np.nan, index=matrix.columns)
+    for item_id, score in st.session_state.ratings.items():
+        user_vector[item_id] = score
+
+    user_mean = user_vector.mean()
+    centered_user = user_vector.sub(user_mean).fillna(0)
+
+    latent_user = pca.transform([centered_user])
+    recon_user = pca.inverse_transform(latent_user)[0]
+
+    pred = pd.Series(np.clip(recon_user + user_mean, 1, 5), index=matrix.columns)
+    recs = pred[user_vector.isna()].sort_values(ascending=False).head(10)
+
+    result = pd.DataFrame({"item": recs.index, "score": recs.values}).merge(movies, on="item", how="left")
+
+    for pos, (_, row) in enumerate(result.iterrows(), start=1):
         st.markdown(
             f"""
-            <div class='movie-card'>
-                <p class='movie-title'>{movie['title']}</p>
-                <p class='movie-meta'>🎭 {movie['genre_list']} • 📅 {movie['release_year']}</p>
+            <div class="card">
+                <div class="movie-title">{pos}. {row['title']}</div>
+                <div class="movie-meta">Generos: {row['genres'] or 'No disponible'}</div>
+                <div class="movie-meta">Ano: {row['year'] or 'No disponible'}</div>
+                <div class="score">Score estimado: {row['score']:.2f}</div>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
-        rating = st.radio(
-            "Dê sua nota a este filme:",
-            ["1", "2", "3", "4", "5"],
-            index=0,
-            key=f"rating_{current_idx}",
-            horizontal=True,
-        )
-        st.session_state.my_ratings[int(movie["item_id"])] = int(rating)
+    if st.button("Reiniciar"):
+        st.session_state.i = 0
+        st.session_state.ratings = {}
+        st.session_state.sample = movies.sample(20, random_state=42).reset_index(drop=True)
+        st.rerun()
 
-        st.progress((current_idx + 1) / len(st.session_state.sample_movies))
-        st.write(f"Filme {current_idx + 1} de {len(st.session_state.sample_movies)}")
+# ---------- EVALUACIÓN DEL MODELO ----------
 
-        col1, col2, col3 = st.columns([1, 1, 1])
-        if col1.button("⬅️ Anterior") and current_idx > 0:
-            st.session_state.current_idx -= 1
-            st.experimental_rerun()
-        if col3.button("Próximo ➡️"):
-            if current_idx < len(st.session_state.sample_movies) - 1:
-                st.session_state.current_idx += 1
-                st.experimental_rerun()
-        if current_idx == len(st.session_state.sample_movies) - 1:
-            if col2.button("Ver recomendações"):
-                st.session_state.view = "results"
-                st.experimental_rerun()
+true = matrix.where(holdout).stack()
+predicted = final.where(holdout).stack()
 
-elif st.session_state.view == "results":
-    st.title("Recomendações AnnaFlix")
-    st.markdown(f"<div class='brand-badge'>tempo de cinema com a Anna</div>", unsafe_allow_html=True)
-    st.markdown(f"<p class='subtitle'>Pronto, {st.session_state.name}? Estas são as escolhas que mais combinam com seu estilo.</p>", unsafe_allow_html=True)
+rmse = np.sqrt(((true - predicted)**2).mean())
 
-    with st.spinner("Gerando recomendações..."):
-        user_item = build_user_item_matrix(ratings, popular_ids)
-        recommendations = get_recommendations(
-            st.session_state.my_ratings,
-            user_item,
-            movies,
-            top_n=top_n,
-            n_components=25,
-        )
+col1, col2 = st.columns([1, 3])
 
-    if recommendations.empty:
-        st.warning("Ops! Não consegui montar recomendações suficientes com as notas atuais. Tente avaliar mais filmes.")
-    else:
-        for _, row in recommendations.iterrows():
-            st.markdown(
-                f"""
-                <div class='movie-card'>
-                    <p class='movie-title'>{row['title']}</p>
-                    <p class='movie-meta'>🎭 {row['genre_list']} • 📅 {row['release_year']} • ⭐ {row['predicted_rating']:.1f}</p>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+with col1:
+    st.metric("RMSE", f"{rmse:.3f}")
 
-    if st.button("Avaliar novamente", type="primary"):
-        reset_session()
-        st.experimental_rerun()
+
