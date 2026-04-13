@@ -6,7 +6,8 @@ import streamlit as st
 from sklearn.decomposition import TruncatedSVD
 
 st.set_page_config(
-    page_title="CinemaMatch Recommender",
+    page_title="AnnaFlix Recommender",
+    page_icon="🎬",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -41,47 +42,60 @@ def inject_styles() -> None:
         <style>
         :root {
             color-scheme: dark;
-            color: #e5e7eb;
-            background-color: #0b1120;
+            color: #f8efe7;
+            background-color: #221b2d;
         }
         .stApp {
-            background: linear-gradient(180deg, #0b1120 0%, #111827 100%);
-            color: #e5e7eb;
+            background: linear-gradient(180deg, #221b2d 0%, #3f2a4d 45%, #f7ede6 100%);
+            color: #f8efe7;
         }
         .block-container {
-            padding: 1.2rem 2rem 2rem 2rem;
-            max-width: 1100px;
+            padding: 1.5rem 2.2rem 2.2rem 2.2rem;
+            max-width: 1120px;
         }
         h1, h2, h3, h4, h5, h6 {
             font-family: Inter, system-ui, sans-serif;
             color: #ffffff;
         }
         .movie-card {
-            background: #111827;
-            border: 1px solid rgba(148, 163, 184, 0.18);
-            border-radius: 16px;
-            padding: 20px;
-            margin-bottom: 16px;
+            background: rgba(255, 250, 245, 0.96);
+            border: 1px solid rgba(255, 168, 190, 0.24);
+            border-radius: 20px;
+            padding: 22px;
+            margin-bottom: 18px;
+            box-shadow: 0 20px 40px rgba(17, 17, 26, 0.12);
         }
         .movie-title {
-            color: #f8fafc;
-            font-size: 1.1rem;
+            color: #2b1b34;
+            font-size: 1.2rem;
             margin: 0;
+            font-weight: 700;
         }
         .movie-meta {
-            color: #94a3b8;
-            font-size: 0.92rem;
-            margin: 6px 0 0;
+            color: #6e5873;
+            font-size: 0.93rem;
+            margin: 8px 0 0;
         }
         .stButton > button {
-            background-color: #0ea5e9 !important;
-            color: #ffffff !important;
+            background-color: #d879ff !important;
+            color: #1f1a2f !important;
             border: none !important;
+            box-shadow: 0 10px 20px rgba(216, 121, 255, 0.22) !important;
         }
         .subtitle {
-            color: #94a3b8;
+            color: #ead1d8;
             margin-top: -10px;
             margin-bottom: 24px;
+            font-size: 1rem;
+        }
+        .brand-badge {
+            display: inline-flex;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: rgba(216, 121, 255, 0.18);
+            color: #f7e8f2;
+            font-size: 0.9rem;
+            margin-bottom: 18px;
         }
         footer {visibility: hidden;}
         </style>
@@ -208,14 +222,14 @@ if "sample_movies" not in st.session_state:
         .reset_index(drop=True)
     )
 
-st.sidebar.title("CinemaMatch")
-st.sidebar.markdown("Escolha a forma de ver recomendações e quantas você quer receber.")
-selected_model = st.sidebar.selectbox("Modelo", ["SVD"], help="Use a collaborative filtering model based on SVD.")
-top_n = st.sidebar.slider("Número de recomendações", 5, 15, 10)
+st.sidebar.title("AnnaFlix")
+st.sidebar.markdown("Bem-vindo ao recomendador com a cara da Anna. Avalie alguns filmes e receba sugestões feitas especialmente para você.")
+top_n = st.sidebar.slider("Quantas recomendações você quer?", 5, 15, 10)
 
 if st.session_state.view == "home":
-    st.title("CinemaMatch")
-    st.markdown("<p class='subtitle'>Avalie 20 filmes para receber recomendações personalizadas.</p>", unsafe_allow_html=True)
+    st.title("AnnaFlix")
+    st.markdown("<div class='brand-badge'>by Anna</div>", unsafe_allow_html=True)
+    st.markdown("<p class='subtitle'>Responda rápido e descubra filmes que combinam com seu gosto.</p>", unsafe_allow_html=True)
 
     if not st.session_state.started:
         name_input = st.text_input("Seu nome", value=st.session_state.name)
@@ -241,7 +255,7 @@ if st.session_state.view == "home":
         )
 
         rating = st.radio(
-            "Como você avalia este filme?",
+            "Dê sua nota a este filme:",
             ["1", "2", "3", "4", "5"],
             index=0,
             key=f"rating_{current_idx}",
@@ -266,8 +280,9 @@ if st.session_state.view == "home":
                 st.experimental_rerun()
 
 elif st.session_state.view == "results":
-    st.title("Suas Recomendações")
-    st.markdown(f"<p class='subtitle'>Obrigado, {st.session_state.name}! Aqui estão filmes que você provavelmente vai gostar.</p>", unsafe_allow_html=True)
+    st.title("Recomendações AnnaFlix")
+    st.markdown(f"<div class='brand-badge'>tempo de cinema com a Anna</div>", unsafe_allow_html=True)
+    st.markdown(f"<p class='subtitle'>Pronto, {st.session_state.name}? Estas são as escolhas que mais combinam com seu estilo.</p>", unsafe_allow_html=True)
 
     with st.spinner("Gerando recomendações..."):
         user_item = build_user_item_matrix(ratings, popular_ids)
@@ -280,7 +295,7 @@ elif st.session_state.view == "results":
         )
 
     if recommendations.empty:
-        st.warning("Não foi possível gerar recomendações com os dados fornecidos.")
+        st.warning("Ops! Não consegui montar recomendações suficientes com as notas atuais. Tente avaliar mais filmes.")
     else:
         for _, row in recommendations.iterrows():
             st.markdown(
